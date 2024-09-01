@@ -1,0 +1,8 @@
+[package]
+name = "jeeves"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+jsonic = "0.2.12"
+simple-websockets = "0.1.6"
