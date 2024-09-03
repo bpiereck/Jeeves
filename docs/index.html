@@ -4,18 +4,38 @@
   <meta charset="utf-8">
   <title>Code art</title>
   <link rel="stylesheet" href="styles.css">
+  <link href="https://cdn.jsdelivr.net/npm/@vibbioinfocore/vib-css@latest" rel="stylesheet">
 </head>
-<body style="display: flex; flex-direction: column">
-  <section>
-    <h1>RSE Hackathon</h1>
-    <div style="display:flex">      
-      <a href="#">Javascript Example</a>
-      <a href="#">Python Example</a>
-      <a href="#">R Example</a>
-      <a href="#">Java Example</a>
-      <a href="#">Rust Example</a>
+<body class="vib-body">
+  <header class="vib-header">
+    <div class="vib-bar-breadcrumb">
+      <div class="vib-breadcrumbs">
+        <a class="vib-main-site" href="https://vib.be" target="_blank" rel="noopener noreferrer">
+          <img class="vib-logo-small" src="/vib.svg" alt="VIB Logo">
+        </a>
+        <a class="breadcrumb" href="/jeeves">RSE Hackathon</a>
+      </div>
     </div>
-  </section>
+    <nav class="vib-nav">
+      <h1 class="vib-app-logo">RSE Hackathon</h1>
+      <label class="vib-menu-toggle-button" for="vib-toggle-menu">
+        <span class="vib-menu-button-bar vib-menu-top"></span>
+        <span class="vib-menu-button-bar vib-menu-middle"></span>
+        <span class="vib-menu-button-bar vib-menu-bottom"></span>
+      </label>
+      <ul class="vib-main-menu" role="menu">
+        <li>
+          <a href="https://github.com/MaybeJustJames/Jeeves/blob/main/examples/javascript/painter.js">Javascript Example</a>
+        </li>
+        <li>
+          <a href="https://github.com/MaybeJustJames/Jeeves/blob/main/examples/python/painter.py">Python Example</a>
+        </li>
+        <li><a href="#">R Example</a></li>
+        <li><a href="#">Java Example</a></li>
+        <li><a href="#">Rust Example</a></li>
+      </ul>
+    </nav>
+  </header>
   <section id="canvases" style="display: flex; flex-wrap: wrap"></section>
   <script type="module" src="./index.js"></script>
 </body>
