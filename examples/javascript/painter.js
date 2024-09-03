@@ -1,4 +1,4 @@
-const socket = new WebSocket("wss://rsehackathon.serveo.net");
+const socket = new WebSocket("wss://rse.pagekite.me");
 
 const WHO_ARE_YOU = "?";
 const SEND_ME_PIXELS = "p";

@@ -1,7 +1,7 @@
 const WHO_ARE_YOU = "?";
 const SEND_ME_PIXELS = "p";
 
-const socket = new WebSocket("wss://rsehackathon.serveo.net");
+const socket = new WebSocket("wss://rse.pagekite.me");
 
 let canvas_width = 0;
 let canvas_height = 0;
