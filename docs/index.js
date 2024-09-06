@@ -1,5 +1,6 @@
 const WHO_ARE_YOU = "?";
 const SEND_ME_PIXELS = "p";
+const CANVAS_SIZE = "size";
 
 const socket = new WebSocket("wss://rse.pagekite.me");
 
@@ -7,23 +8,21 @@ let canvas_width = 0;
 let canvas_height = 0;
 
 socket.addEventListener("message", async (event) => {
-	switch (event.data) {
-	case WHO_ARE_YOU:
-		socket.send(JSON.stringify({msg: WHO_ARE_YOU, "?": "canvas"}));
-		break;
-	default:  // pixel data
-		if (event.data instanceof Blob) {
+	if (event.data instanceof Blob) {
 			event.data.arrayBuffer().then(decodePixels).then(showOnCanvas);
-		} else {
-			const message = JSON.parse(event.data);
-			switch (message.msg) {
-			case "size":
-				canvas_width = message.w;
-				canvas_height = message.h;
-				break;
-			}
+	} else {
+		const message = JSON.parse(event.data);
+		switch (message.msg) {
+		case WHO_ARE_YOU:
+			socket.send(JSON.stringify({msg: WHO_ARE_YOU, [WHO_ARE_YOU]: "canvas"}));
+			break;
+		case CANVAS_SIZE:
+			canvas_width = message.w;
+			canvas_height = message.h;
+			break;
+		default:
+			break;
 		}
-		break;
 	}
 });
 
@@ -87,5 +86,6 @@ function showOnCanvas(painters) {
 
 // periodically ask for pixels
 setInterval(() => {
+	console.log(socket.readyState);
 	socket.send(JSON.stringify({msg: SEND_ME_PIXELS}));
 }, 1000);

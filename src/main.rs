@@ -6,7 +6,6 @@ use simple_websockets::{Event, Message, Responder};
 
 enum ClientData {
     Painter(Vec<u8>),
-    Player,
     Canvas,
     Unknown,
 }
@@ -14,6 +13,8 @@ enum ClientData {
 struct Client {
     data: ClientData,
     responder: Responder,
+    name: String,
+    url: String,
 }
 
 const WHO_ARE_YOU: &str = "?";
@@ -21,7 +22,6 @@ const SEND_ME_PIXELS: &str = "p";
 const CANVAS_WIDTH: usize = 20;
 const CANVAS_HEIGHT: usize = 20;
 const CANVAS_BUFFER_SIZE: usize = CANVAS_WIDTH * CANVAS_HEIGHT * 4; // 4 bytes / pixel
-const CANVAS_SIZE: &str = "{\"msg\": \"size\", \"w\": 20, \"h\": 20}";
 
 fn poll_painters(clients: Arc<RwLock<HashMap<u64, Client>>>) {
     loop {
@@ -33,7 +33,7 @@ fn poll_painters(clients: Arc<RwLock<HashMap<u64, Client>>>) {
                     println!("Asking for pixeldata from client: {}", id);
                     client
                         .responder
-                        .send(Message::Text(String::from(SEND_ME_PIXELS)));
+                        .send(Message::Text(format!("{{\"msg\": \"{SEND_ME_PIXELS}\"}}")));
                 }
             }
         }
@@ -59,9 +59,11 @@ fn main() {
                     Client {
                         data: ClientData::Unknown,
                         responder: responder.clone(),
+                        name: Default::default(),
+                        url: Default::default(),
                     },
                 );
-                responder.send(Message::Text(String::from(WHO_ARE_YOU)));
+                responder.send(Message::Text(format!("{{\"msg\": \"{WHO_ARE_YOU}\"}}")));
             }
             Event::Disconnect(client_id) => {
                 println!("Client #{} disconnected.", client_id);
@@ -82,21 +84,29 @@ fn main() {
                         Some(WHO_ARE_YOU) => {
                             let mut cs = clients.write().unwrap();
 
-                            if sent[WHO_ARE_YOU].as_str() != Some("player") {
-                                if let Some(client) = cs.get(&client_id) {
-                                    client
-                                        .responder
-                                        .send(Message::Text(String::from(CANVAS_SIZE)));
-                                }
-                            }
+                            if let Some(client) = cs.get(&client_id) {
+                                client
+                                    .responder
+                                    .send(
+                                        Message::Text(
+                                            format!(
+                                                "{{\"msg\": \"size\", \"w\": {CANVAS_WIDTH}, \"h\": {CANVAS_HEIGHT}}}"
+                                            )
+                                        )
+                                    );
+                            };
+                            
 
                             cs.entry(client_id).and_modify(|client| {
                                 match sent[WHO_ARE_YOU].as_str() {
                                     Some("painter") => {
                                         client.data =
-                                            ClientData::Painter(vec![0; CANVAS_BUFFER_SIZE])
+                                            ClientData::Painter(vec![0; CANVAS_BUFFER_SIZE]);
+                                        client.name =
+                                            String::from(sent["name"].as_str().unwrap_or_default());
+                                        client.url =
+                                            String::from(sent["url"].as_str().unwrap_or_default());
                                     }
-                                    Some("player") => client.data = ClientData::Player,
                                     Some("canvas") => client.data = ClientData::Canvas,
                                     Some(_) | None => (),
                                 }
@@ -131,7 +141,10 @@ fn main() {
                                 client.responder.send(Message::Binary(data));
                             };
                         }
-                        Some(_) => todo!(),
+                        Some(msg) => {
+                            eprintln!("Received unknown message: {}", msg);
+                            todo!()
+                        },
                         None => todo!(),
                     });
                 }
