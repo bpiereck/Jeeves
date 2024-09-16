@@ -1,6 +1,6 @@
 # How to play
 
-![System overview](overview.svg)
+![System overview](docs/overview.svg)
 
 You are going to write a "Painter". You connect a websocket to "Jeeves" and send RGBA encoded pixel data to Jeeves everytime it asks you for pixels.
 
@@ -11,4 +11,4 @@ Here are examples of painters in various languages:
 
 ## Communicating with Jeeves
 
-![Communication sequence diagram](sequence.svg)
+![Communication sequence diagram](docs/sequence.svg)
