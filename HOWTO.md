@@ -8,6 +8,7 @@ Here are examples of painters in various languages:
 
 * [Javascript](https://github.com/MaybeJustJames/Jeeves/blob/main/examples/javascript/painter.js)
 * [Python](https://github.com/MaybeJustJames/Jeeves/blob/main/examples/python/painter.py)
+* [R](https://github.com/MaybeJustJames/Jeeves/blob/main/examples/R/painter.R)
 
 ## Communicating with Jeeves
 
