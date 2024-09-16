@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Code art</title>
+  <title>RSE Hackathon</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://cdn.jsdelivr.net/npm/@vibbioinfocore/vib-css@latest" rel="stylesheet">
 </head>
@@ -17,7 +17,6 @@
       </div>
     </div>
     <nav class="vib-nav">
-      <h1 class="vib-app-logo">RSE Hackathon</h1>
       <label class="vib-menu-toggle-button" for="vib-toggle-menu">
         <span class="vib-menu-button-bar vib-menu-top"></span>
         <span class="vib-menu-button-bar vib-menu-middle"></span>
@@ -36,6 +35,8 @@
       </ul>
     </nav>
   </header>
-  <section id="canvases" style="display: flex; flex-wrap: wrap"></section>
+  <section id="main">
+    <canvas id="canvas" width="40" height="40"></canvas>
+  </section>
   <script type="module" src="./index.js"></script>
 </body>

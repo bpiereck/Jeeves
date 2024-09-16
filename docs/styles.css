@@ -1,5 +1,22 @@
+body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+section#main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+}
+
 canvas {
-    width: 300px;
-    height: 300px;
+    width: 80vh;
+    height: 80vh;
     image-rendering: pixelated;
+    border: 1px solid black;
+    background-color: white;
 }
