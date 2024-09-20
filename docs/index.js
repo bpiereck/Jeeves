@@ -2,7 +2,13 @@ const WHO_ARE_YOU = "?";
 const SEND_ME_PIXELS = "p";
 const CANVAS_SIZE = "size";
 
-const socket = new WebSocket("wss://rse.pagekite.me");
+
+const socket = new WebSocket(
+	window.location.search.includes("debug")
+		? "ws://127.0.0.1:8080"
+		: "wss://rse.pagekite.me"
+
+);
 
 socket.addEventListener("message", async (event) => {
 	if (event.data instanceof Blob) {
