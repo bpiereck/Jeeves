@@ -66,9 +66,14 @@ def render(rotate_by: float, buf: Buffer) -> bytes:
 
 def main():
     """Main entry point."""
+    import sys
+    if len(sys.argv) >= 2:
+        ws_uri = sys.argv[1]
+    else:
+        ws_uri = "wss://rse.pagekite.me"
     image = Buffer(image=b'', width=0, height=0)
     rotation = 0
-    with connect("wss://rse.pagekite.me") as websocket:
+    with connect(ws_uri) as websocket:
         while True:
             message = json.loads(websocket.recv())
             match message.get("msg"):
