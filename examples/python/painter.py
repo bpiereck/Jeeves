@@ -15,6 +15,7 @@ MESSAGES = SimpleNamespace()
 MESSAGES.WHO_ARE_YOU = "?"
 MESSAGES.SEND_ME_PIXELS = "p"
 MESSAGES.BUFFER_SIZE = "size"
+MESSAGES.ERROR = "error"
 
 Pixel = tuple[int, int, int, int]
 
@@ -75,7 +76,8 @@ def main():
     rotation = 0
     with connect(ws_uri) as websocket:
         while True:
-            message = json.loads(websocket.recv())
+            text = websocket.recv()
+            message = json.loads(text)
             match message.get("msg"):
                 case MESSAGES.WHO_ARE_YOU:
                     websocket.send(json.dumps({
@@ -94,8 +96,12 @@ def main():
                     width = message.get("w")
                     height = message.get("h")
                     image = setup_buffer(width, height)
-                case _:
-                    pass
+                case MESSAGES.ERROR:
+                    print(message.get(MESSAGES.ERROR))
+                case other:
+                    print("Unknown message:")
+                    print(other)
+                    print("+++++++++++++++++++++")
                 
 
 

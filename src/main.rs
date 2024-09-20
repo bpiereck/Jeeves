@@ -49,7 +49,7 @@ fn poll_painters(clients: Arc<RwLock<HashMap<u64, Client>>>) {
 fn handle_error(message: String, client: &mut Client) -> Action {
     client.naughty += 1;
     let json = format!(
-        "{{\"msg\": \"error\", \"FINAL WARNING {}\", \"naughty\": {}}}",
+        "{{\"msg\": \"error\", \"error\": \"FINAL WARNING {}\", \"naughty\": {}}}",
         message.replace("\"", "\\\""),
         client.naughty
     );
