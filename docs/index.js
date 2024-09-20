@@ -33,7 +33,7 @@ function showOnCanvas(pixels) {
 	canvas.height = dim;
 	if (debug) {
 		console.log(`dim = ${dim}; there are ${pixels.byteLength} bytes in the buffer`);
-		console.log(pixelsToHex(pixels));
+		console.log(pixelsToHex(new Uint8Array(pixels)));
 	}
 	const bufferSize = dim * dim * 4;
 	if (dim > 0) {
