@@ -48,17 +48,15 @@ fn poll_painters(clients: Arc<RwLock<HashMap<u64, Client>>>) {
 
 fn handle_error(message: String, client: &mut Client) -> Action {
     client.naughty += 1;
-    let json = format!("{{\"msg\": \"error\", \"FINAL WARNING {}\", \"naughty\": {}}}", message.replace("\"", "\\\""), client.naughty);
+    let json = format!(
+        "{{\"msg\": \"error\", \"FINAL WARNING {}\", \"naughty\": {}}}",
+        message.replace("\"", "\\\""),
+        client.naughty
+    );
     match client.naughty.cmp(&NAUGHTY_WARNING) {
-        Ordering::Less => {
-            Action::SendMessage(Message::Text(json.replace("FINAL WARNING ", "")))
-        },
-        Ordering::Equal => {
-            Action::SendMessage(Message::Text(json))
-        },
-        Ordering::Greater => {
-            Action::RemoveClient
-        }
+        Ordering::Less => Action::SendMessage(Message::Text(json.replace("FINAL WARNING ", ""))),
+        Ordering::Equal => Action::SendMessage(Message::Text(json)),
+        Ordering::Greater => Action::RemoveClient,
     }
 }
 
@@ -102,7 +100,28 @@ fn main() {
             }
             Event::Message(client_id, message) => match message {
                 Message::Binary(pixels) => {
-                    image_buffer.update(client_id, pixels);
+                    if let Err(error) = image_buffer.update(client_id, pixels) {
+                        match error {
+                            crate::buffer::UpdateError::Server(message) => {
+                                eprintln!("Error updating pixels for {}: {}", client_id, message);
+                            },
+                            crate::buffer::UpdateError::Client(message) => {
+                                let mut cs = clients.write().unwrap();
+                                if let Some(client) = cs.get_mut(&client_id) {
+                                    match handle_error(message, client) {
+                                        Action::RemoveClient => {
+                                            client.responder.close();
+                                            cs.remove(&client_id);
+                                            image_buffer.remove(client_id);
+                                        },
+                                        Action::SendMessage(msg) => {
+                                            client.responder.send(msg);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 Message::Text(text) => {
                     let _ = jsonic::parse(&text)
@@ -141,8 +160,13 @@ fn main() {
                                                     String::from(sent["name"].as_str().unwrap_or_default());
                                                 client.url =
                                                     String::from(sent["url"].as_str().unwrap_or_default());
-                                                image_buffer.insert(client_id);
-                                                client.responder.send(size_message);
+                                                if let Err(error) = image_buffer.insert(client_id) {
+                                                    eprintln!("{}", error);
+                                                    client.responder.close();
+                                                    cs.remove(&client_id);
+                                                } else {
+                                                    client.responder.send(size_message);
+                                                }
                                             },
                                             Some("canvas") => {
                                                 client.data = ClientData::Canvas;
@@ -211,7 +235,7 @@ fn main() {
                             }
                         });
                 }
-            }
+            },
         }
     }
 }
