@@ -52,20 +52,13 @@ impl std::fmt::Debug for Client {
 }
 
 pub struct Buffer {
-    clients: Vec<Client>
+    clients: Vec<Client>,
+    pixels: Vec<u8>,
 }
 
-impl From<&Buffer> for Vec<u8> {
-    fn from(buffer: &Buffer) -> Self {
-        // The trick here is to position the client buffers correctly
-        let dim = buffer.dim();
-        let mut pixels: Vec<u8> = vec![0; dim * dim * PIXEL_SIZE];
-        for (index, client) in buffer.clients.iter().enumerate() {
-            if let Some((x, y)) = coordinate_of(index + 1) {
-                buffer.blit(&mut pixels, x * BUFFER_PIXELS, y * BUFFER_PIXELS, client.buffer);
-            }
-        }
-        pixels
+impl<'a> From<&'a Buffer> for &'a Vec<u8> {
+    fn from(buffer: &'a Buffer) -> Self {
+        &buffer.pixels
     }
 }
 
@@ -77,8 +70,10 @@ impl Default for Buffer {
 
 impl Buffer {
     pub fn new() -> Buffer {
+        let pixels = Vec::with_capacity(64 * CLIENT_PIXELS * PIXEL_SIZE);
         Buffer {
-            clients: Vec::new()
+            clients: Vec::new(),
+            pixels,
         }
     }
 
@@ -87,8 +82,17 @@ impl Buffer {
             return;
         }
 
+        let pre_dim = self.dim();
+
         let client = Client {id, buffer: [0; CLIENT_PIXELS * PIXEL_SIZE]};
         self.clients.push(client);
+
+        let post_dim = self.dim();
+        if pre_dim < post_dim {
+            // Need to re-size and re-render
+            self.pixels.resize(post_dim * post_dim * PIXEL_SIZE, 0);
+            self.full_render();
+        }
     }
 
     pub fn remove(&mut self, id: u64) {
@@ -99,8 +103,15 @@ impl Buffer {
 
     pub fn update(&mut self, id: u64, data: Vec<u8>) {
         println!("Attempting to copy {} bytes to a buffer of {} bytes.", data.len(), CLIENT_PIXELS * PIXEL_SIZE);
-        if let Some(client) = self.clients.iter_mut().find(|c| c.id == id) {
-            client.buffer.copy_from_slice(&data);
+        let client = self.clients.iter().position(|c| c.id == id); //.enumerate().find(|(_, c)| c.id == id);
+        if let Some(i) = client {
+            if data.len() > CLIENT_PIXELS * PIXEL_SIZE {
+                eprintln!("Warning: data is larger than buffer")
+            }
+            self.clients[i].buffer.copy_from_slice(&data[0..(CLIENT_PIXELS * PIXEL_SIZE)]);
+            if let Some((x, y)) = coordinate_of(i) {
+                self.blit(x * BUFFER_PIXELS, y * BUFFER_PIXELS, self.clients[i].buffer);
+            }
         } else {
             eprintln!("Error: could not find the client to update pixels.");
         }
@@ -110,7 +121,7 @@ impl Buffer {
         (self.clients.len() as f32).sqrt().ceil() as usize * BUFFER_PIXELS
     }
 
-    fn blit(&self, dst: &mut [u8], x: usize, y: usize, source: [u8; CLIENT_PIXELS * PIXEL_SIZE]) {
+    fn blit(&mut self, x: usize, y: usize, source: [u8; CLIENT_PIXELS * PIXEL_SIZE]) {
         let copy_width = BUFFER_PIXELS * PIXEL_SIZE;
         let buffer_width = self.dim() * PIXEL_SIZE;
         let start = y * buffer_width + x * PIXEL_SIZE;
@@ -119,8 +130,26 @@ impl Buffer {
             let dst_to = dst_from + copy_width;
             let src_from = y_off * copy_width;
             let src_to = src_from + copy_width;
-            dst[dst_from..dst_to].copy_from_slice(&source[src_from..src_to])
+            self.pixels[dst_from..dst_to].copy_from_slice(&source[src_from..src_to])
         })
+    }
+
+    fn full_render(&mut self) {
+        // The trick here is to position the client buffers correctly
+        let render_data: Vec<_> = self.clients
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| {
+                if let Some((x, y)) = coordinate_of(i + 1) {
+                    Some((x * BUFFER_PIXELS, y * BUFFER_PIXELS, c.buffer))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for (x, y, buffer) in render_data {
+            self.blit(x, y, buffer);
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
@@ -17,10 +18,17 @@ struct Client {
     responder: Responder,
     name: String,
     url: String,
+    naughty: u32,
+}
+
+enum Action {
+    RemoveClient,
+    SendMessage(Message),
 }
 
 const WHO_ARE_YOU: &str = "?";
 const SEND_ME_PIXELS: &str = "p";
+const NAUGHTY_WARNING: u32 = 50;
 
 fn poll_painters(clients: Arc<RwLock<HashMap<u64, Client>>>) {
     loop {
@@ -34,6 +42,22 @@ fn poll_painters(clients: Arc<RwLock<HashMap<u64, Client>>>) {
                         .send(Message::Text(format!("{{\"msg\": \"{SEND_ME_PIXELS}\"}}")));
                 }
             }
+        }
+    }
+}
+
+fn handle_error(message: String, client: &mut Client) -> Action {
+    client.naughty += 1;
+    let json = format!("{{\"msg\": \"error\", \"FINAL WARNING {}\", \"naughty\": {}}}", message.replace("\"", "\\\""), client.naughty);
+    match client.naughty.cmp(&NAUGHTY_WARNING) {
+        Ordering::Less => {
+            Action::SendMessage(Message::Text(json.replace("FINAL WARNING ", "")))
+        },
+        Ordering::Equal => {
+            Action::SendMessage(Message::Text(json))
+        },
+        Ordering::Greater => {
+            Action::RemoveClient
         }
     }
 }
@@ -62,6 +86,7 @@ fn main() {
                             responder: responder.clone(),
                             name: Default::default(),
                             url: Default::default(),
+                            naughty: 0,
                         },
                     );
                 }
@@ -80,52 +105,113 @@ fn main() {
                     image_buffer.update(client_id, pixels);
                 }
                 Message::Text(text) => {
-                    let _ = jsonic::parse(&text).map(|sent| match sent["msg"].as_str() {
-                        Some(WHO_ARE_YOU) => {
+                    let _ = jsonic::parse(&text)
+                        .map_err(|e| {
                             let mut cs = clients.write().unwrap();
-
-                            if let Some(client) = cs.get(&client_id) {
-                                client.responder.send(Message::Text(format!(
-                                    "{{\"msg\": \"size\", \"w\": {}, \"h\": {}}}",
-                                    buffer::BUFFER_PIXELS,
-                                    buffer::BUFFER_PIXELS
-                                )));
-                            };
-
-                            cs.entry(client_id).and_modify(|client| {
-                                match sent[WHO_ARE_YOU].as_str() {
-                                    Some("painter") => {
-                                        client.data = ClientData::Painter;
-                                        client.name =
-                                            String::from(sent["name"].as_str().unwrap_or_default());
-                                        client.url =
-                                            String::from(sent["url"].as_str().unwrap_or_default());
-                                        image_buffer.insert(client_id);
+                            if let Some(client) = cs.get_mut(&client_id) {
+                                match handle_error(format!("(Cannot parse) {}", e), client) {
+                                    Action::RemoveClient => {
+                                        client.responder.close();
+                                        cs.remove(&client_id);
+                                        image_buffer.remove(client_id);
+                                    },
+                                    Action::SendMessage(msg) => {
+                                        client.responder.send(msg);
                                     }
-                                    Some("canvas") => client.data = ClientData::Canvas,
-                                    Some(_) | None => (),
                                 }
-                            });
-                        }
-                        Some(SEND_ME_PIXELS) => {
-                            let cs = clients.read().unwrap();
-                            if let Some(client) = cs.get(&client_id) {
-                                let image = Vec::<u8>::from(&image_buffer);
-                                if !image.is_empty() {
-                                    let mut message =
-                                        (image_buffer.dim() as u16).to_be_bytes().to_vec();
-                                    message.extend(image);
-                                    client.responder.send(Message::Binary(message));
+                            } else {
+                                eprintln!("Unknown client id {}", client_id);
+                            }
+                        })
+                        .map(|sent| {
+                            let mut cs = clients.write().unwrap();
+                            if let Some(client) = cs.get_mut(&client_id) {
+                                match sent["msg"].as_str() {
+                                    Some(WHO_ARE_YOU) => {
+                                        let size_message = Message::Text(format!(
+                                            "{{\"msg\": \"size\", \"w\": {}, \"h\": {}}}",
+                                            buffer::BUFFER_PIXELS,
+                                            buffer::BUFFER_PIXELS
+                                        ));
+
+                                        match sent[WHO_ARE_YOU].as_str() {
+                                            Some("painter") => {
+                                                client.data = ClientData::Painter;
+                                                client.name =
+                                                    String::from(sent["name"].as_str().unwrap_or_default());
+                                                client.url =
+                                                    String::from(sent["url"].as_str().unwrap_or_default());
+                                                image_buffer.insert(client_id);
+                                                client.responder.send(size_message);
+                                            },
+                                            Some("canvas") => {
+                                                client.data = ClientData::Canvas;
+                                                client.responder.send(size_message);
+                                            },
+                                            Some(who) => {
+                                                match handle_error(format!("{} is not a valid ?. Should be painter or canvas", who), client) {
+                                                    Action::RemoveClient => {
+                                                        client.responder.close();
+                                                        cs.remove(&client_id);
+                                                        image_buffer.remove(client_id);
+                                                    },
+                                                    Action::SendMessage(msg) => {
+                                                        client.responder.send(msg);
+                                                    }
+                                                }
+                                            },
+                                            None => {
+                                                match handle_error(String::from("Expected field ?"), client) {
+                                                    Action::RemoveClient => {
+                                                        client.responder.close();
+                                                        cs.remove(&client_id);
+                                                        image_buffer.remove(client_id);
+                                                    },
+                                                    Action::SendMessage(msg) => {
+                                                        client.responder.send(msg);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    Some(SEND_ME_PIXELS) => {
+                                        let image = <&Vec::<u8>>::from(&image_buffer);
+                                        if !image.is_empty() {
+                                            let mut message =
+                                                (image_buffer.dim() as u16).to_be_bytes().to_vec();
+                                            message.extend(image);
+                                            client.responder.send(Message::Binary(message));
+                                        }
+                                    },
+                                    Some(msg) => {
+                                        match handle_error(format!("Unknown message: {}", msg), client) {
+                                            Action::RemoveClient => {
+                                                client.responder.close();
+                                                cs.remove(&client_id);
+                                                image_buffer.remove(client_id);
+                                            },
+                                            Action::SendMessage(msg) => {
+                                                client.responder.send(msg);
+                                            }
+                                        }
+                                    },
+                                    None => {
+                                        match handle_error(String::from("Invalid message"), client) {
+                                            Action::RemoveClient => {
+                                                client.responder.close();
+                                                cs.remove(&client_id);
+                                                image_buffer.remove(client_id);
+                                            },
+                                            Action::SendMessage(msg) => {
+                                                client.responder.send(msg);
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                        }
-                        Some(msg) => {
-                            eprintln!("Received unknown message: {}", msg);
-                        }
-                        None => todo!(),
-                    });
+                        });
                 }
-            },
+            }
         }
     }
 }
